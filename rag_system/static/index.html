@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Gemini RAG Studio</title>
+    
+    <!-- Framework & Styling Libraries -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet"/>
+    
+    <!-- Parser Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script>
+        MathJax = {
+            tex: { 
+                inlineMath: [['$', '$'], ['\\(', '\\)']], 
+                displayMath: [['$$', '$$'], ['\\[', '\\]']], 
+                processEscapes: true 
+            },
+            options: { skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre'] }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+    <style data-purpose="custom-styles">
+        body {
+            background-color: #0b0f19;
+            background-image: radial-gradient(circle at 10% 20%, rgba(50, 40, 100, 0.3) 0%, transparent 40%),
+                              radial-gradient(circle at 90% 80%, rgba(20, 30, 80, 0.3) 0%, transparent 40%),
+                              radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.03) 0%, transparent 20%);
+            color: #e2e8f0;
+            font-family: 'Inter', sans-serif;
+        }
+        
+        .gradient-border {
+            position: relative;
+            background: #1e293b;
+            background-clip: padding-box;
+            border: solid 1px transparent;
+            border-radius: 0.75rem;
+        }
+        .gradient-border::before {
+            content: ''; position: absolute; top: 0; right: 0; bottom: 0; left: 0;
+            z-index: -1; margin: -1px; border-radius: inherit;
+            background: linear-gradient(to right, #60a5fa, #a78bfa, #f472b6);
+        }
+
+        .btn-gradient {
+            background: linear-gradient(90deg, #4da1f7 0%, #b258e6 100%);
+            color: white;
+        }
+        .btn-gradient-hover:hover {
+            background: linear-gradient(90deg, #3b8ce6 0%, #a147d5 100%);
+        }
+
+        .source-pill {
+            background: linear-gradient(90deg, #2c515a 0%, #683c65 100%);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.2s ease;
+        }
+        .source-pill:hover {
+            background: linear-gradient(90deg, #35636e 0%, #7b4777 100%);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #475569; border-radius: 10px; }
+
+        /* Universal Marked.js Markdown styles adapter */
+        .ai-content ul { list-style-type: disc; padding-left: 1.5rem; margin-top: 0.75rem; margin-bottom: 0.75rem; }
+        .ai-content ol { list-style-type: decimal; padding-left: 1.5rem; margin-top: 0.75rem; margin-bottom: 0.75rem; }
+        .ai-content li { margin-bottom: 0.35rem; }
+        .ai-content p { margin-bottom: 1rem; }
+        .ai-content strong { color: #f8fafc; font-weight: 700; }
+        .ai-content em { font-style: italic; color: #e2e8f0; }
+        .ai-content blockquote { border-left: 4px solid #a78bfa; padding-left: 1rem; color: #cbd5e1; font-style: italic; margin: 1rem 0; background: rgba(255,255,255,0.03); padding-top: 0.5rem; padding-bottom: 0.5rem; border-radius: 0 0.5rem 0.5rem 0;}
+        .ai-content table { width: 100%; margin: 1.5rem 0; border-collapse: collapse; overflow-x: auto; display: block; }
+        .ai-content th, .ai-content td { border: 1px solid #475569; padding: 0.75rem 1rem; }
+        .ai-content th { background-color: rgba(255,255,255,0.05); font-weight: 600; color: #f8fafc; }
+        .ai-content a { color: #60a5fa; text-decoration: underline; text-underline-offset: 2px; }
+        .ai-content a:hover { color: #93c5fd; }
+        .ai-content hr { border-color: #475569; margin: 2rem 0; }
+        
+        .ai-content pre { background: #0f172a; padding: 1rem; border-radius: 0.5rem; border: 1px solid #334155; overflow-x: auto; margin: 1.25rem 0; }
+        .ai-content code { font-family: 'JetBrains Mono', monospace; background: rgba(0,0,0,0.3); padding: 0.15rem 0.4rem; border-radius: 0.25rem; font-size: 0.85em; color: #e2e8f0;}
+        .ai-content pre code { background: transparent; padding: 0; color: #e2e8f0; font-size: 0.9em; }
+        
+        .ai-content h1 { font-size: 1.65rem; line-height: 2.25rem; color: white; font-weight: 700; margin-top: 2rem; margin-bottom: 1rem; }
+        .ai-content h2 { font-size: 1.4rem; line-height: 2rem; color: white; font-weight: 600; margin-top: 1.75rem; margin-bottom: 0.85rem; }
+        .ai-content h3 { font-size: 1.15rem; line-height: 1.75rem; color: #e2e8f0; font-weight: 600; margin-top: 1.5rem; margin-bottom: 0.75rem; }
+    </style>
+</head>
+<body class="h-screen w-screen overflow-hidden flex">
+
+    <!-- Sidebar -->
+    <aside class="w-72 flex-shrink-0 bg-[#1a1e2d] border-r border-gray-800 flex flex-col transition-all duration-300 z-10">
+        <div class="px-4 pb-4 mt-6">
+            <!-- PDF Upload -->
+            <form id="uploadForm">
+                <label for="fileInput" class="mt-4 border border-dashed border-gray-600 rounded-xl p-6 flex flex-col items-center justify-center cursor-pointer hover:border-gray-400 bg-gradient-to-br from-[#2c515a]/20 to-[#683c65]/20 transition-all group relative">
+                    <input type="file" id="fileInput" name="file" accept=".pdf,.txt,.docx" class="hidden">
+                    <div class="bg-gradient-to-br from-green-400/20 via-purple-500/20 to-pink-500/20 p-3 rounded-full mb-3 group-hover:scale-110 transition-transform">
+                        <i class="fa-regular fa-file-pdf text-2xl text-gray-300"></i>
+                    </div>
+                    <span class="text-sm font-medium text-gray-300">PDF Upload</span>
+                    
+                    <!-- Progress Overlay -->
+                    <div id="uploadStatus" class="absolute inset-0 bg-black/60 rounded-xl flex items-center justify-center text-sm font-semibold opacity-0 pointer-events-none transition-opacity duration-300">
+                        Uploading...
+                    </div>
+                </label>
+            </form>
+        </div>
+
+        <!-- Document List -->
+        <div class="px-4 mb-2 mt-2">
+            <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Uploaded Documents</h3>
+        </div>
+        <div class="flex-1 overflow-y-auto custom-scrollbar px-2 pb-4">
+            <ul class="space-y-1" id="docList">
+                <!-- Dynamically populated -->
+            </ul>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col h-full relative z-0">
+        <div class="absolute inset-0 bg-[#0f172a]/50 pointer-events-none z-[-1]"></div>
+
+        <!-- Scrollable History -->
+        <div class="flex-1 overflow-y-auto p-4 md:p-8 flex flex-col items-center custom-scrollbar" id="chatHistoryBox">
+            <div class="w-full max-w-4xl space-y-8 pb-20" id="chatHistory">
+                
+                <!-- Initial Welcome AI -->
+                <div class="w-full bg-[#282c38]/80 backdrop-blur-md rounded-2xl border border-gray-700/50 shadow-xl overflow-hidden mt-2">
+                    <div class="flex items-center gap-3 px-6 py-4 border-b border-gray-700/50 bg-[#282c38]">
+                        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center shadow-inner">
+                            <i class="fa-solid fa-robot text-white text-sm"></i>
+                        </div>
+                        <h2 class="font-semibold text-lg tracking-wide text-gray-100">AI Assistant</h2>
+                    </div>
+                    <div class="p-6 text-gray-300 text-[15px] leading-relaxed">
+                        Hello! I am connected to your local vector database. Upload a document on the left, then ask me anything about it!
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Input Box -->
+        <div class="p-4 md:p-6 bg-gradient-to-t from-[#0b0f19] to-transparent w-full flex justify-center sticky bottom-0">
+            <div class="w-full max-w-4xl relative">
+                <div class="absolute inset-0 bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-pink-500/20 rounded-full blur-sm"></div>
+                <form id="chatForm" class="relative bg-[#1e2233] border border-gray-600 rounded-full flex items-center px-2 py-2 shadow-2xl transition-all focus-within:border-purple-500/50">
+                    <input class="flex-1 bg-transparent border-none focus:ring-0 text-gray-200 placeholder-gray-500 px-4 text-sm w-full outline-none" id="queryInput" placeholder="Ask a question..." type="text" autocomplete="off" required/>
+                    <button type="submit" class="btn-gradient btn-gradient-hover rounded-full px-5 py-2 text-sm font-medium transition-all shadow-md ml-2 flex-shrink-0">
+                        Send
+                    </button>
+                </form>
+            </div>
+        </div>
+    </main>
+
+    <!-- BEGIN: Right PDF Viewer Column -->
+    <aside id="pdf-viewer-aside" class="hidden w-[450px] flex-shrink-0 bg-[#1a1e2d] border-l border-gray-800 flex flex-col z-10 shadow-[-4px_0_24px_rgba(0,0,0,0.5)] transition-all duration-300">
+        <!-- PDF Viewer Header -->
+        <div class="h-16 flex items-center justify-between px-6 border-b border-gray-800 bg-[#1a1e2d]">
+            <div class="flex flex-col min-w-0 w-[80%]">
+                <h2 id="pdf-viewer-title" class="text-gray-100 font-semibold text-sm truncate">Title</h2>
+                <span id="pdf-viewer-page" class="text-gray-400 text-xs">Page 1</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <button onclick="closePdfViewer()" class="w-8 h-8 flex items-center justify-center rounded-full bg-gray-700/50 text-gray-300 hover:bg-gray-600 hover:text-white transition-colors" title="Close Panel">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- PDF Viewer Content -->
+        <div class="flex-1 overflow-y-auto p-6 bg-[#0b0f19] flex pt-8 justify-center custom-scrollbar">
+            <!-- Simulated PDF Page -->
+            <div class="bg-[#f8f9fa] text-black p-8 rounded-sm shadow-2xl max-w-[420px] w-full text-[10px] leading-relaxed relative border border-gray-300 h-max">
+                <!-- Header -->
+                <div class="flex justify-between items-center mb-6 font-serif border-b border-gray-400 pb-2 text-gray-800 tracking-wide uppercase">
+                    <span id="pdf-viewer-body-title" class="truncate font-bold max-w-[250px]">TITLE</span>
+                    <span id="pdf-viewer-body-page" class="font-bold">1</span>
+                </div>
+                
+                <!-- Highlighted Text Block -->
+                <div id="pdf-viewer-snippet" class="bg-purple-200/50 outline outline-2 outline-purple-400/50 p-4 -mx-2 rounded relative mb-4 text-justify font-serif text-[12.5px] whitespace-pre-wrap leading-[1.8] text-gray-900 border-l-4 border-purple-500">
+                    
+                </div>
+            </div>
+        </div>
+    </aside>
+    <!-- END: Right PDF Viewer Column -->
+
+
+    <!-- Delete Modal Overlay -->
+    <div class="fixed inset-0 bg-black/60 flex items-center justify-center opacity-0 pointer-events-none transition-opacity z-50 duration-300" id="deleteModal">
+        <div class="bg-[#24243e] p-8 rounded-2xl border border-gray-700/50 shadow-2xl max-w-sm w-11/12 text-center transform scale-95 transition-transform duration-300" id="deleteModalBox">
+            <h3 class="text-xl font-semibold text-gray-100 mb-2">Confirm Deletion</h3>
+            <p class="text-gray-400 text-sm mb-6 leading-relaxed">
+                Delete <strong id="modalFilename" class="text-gray-200 break-all"></strong>?<br>This permanently removes it from the LLM's knowledge base.
+            </p>
+            <div class="flex justify-center gap-3">
+                <button class="px-5 py-2 rounded-lg bg-gray-700/50 text-gray-300 hover:bg-gray-700 transition-colors text-sm font-medium" onclick="closeDeleteModal()">Cancel</button>
+                <button class="px-5 py-2 rounded-lg bg-red-500/90 hover:bg-red-500 text-white shadow-lg shadow-red-500/20 transition-all text-sm font-medium" onclick="confirmDelete()">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Document Management & Uploads ---
+        const fileInput = document.getElementById('fileInput');
+        const uploadStatus = document.getElementById('uploadStatus');
+
+        fileInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            uploadStatus.style.opacity = '1';
+            uploadStatus.className = "absolute inset-0 bg-black/80 rounded-xl flex flex-col items-center justify-center text-sm font-semibold opacity-100 pointer-events-auto transition-opacity duration-300 text-blue-300 backdrop-blur-sm z-20";
+            uploadStatus.innerHTML = `<i class="fa-solid fa-spinner fa-spin mb-2 text-xl"></i> Uploading...`;
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/api/upload', true);
+
+            xhr.upload.onprogress = (e) => {
+                if (e.lengthComputable) {
+                    const percent = Math.round((e.loaded / e.total) * 100);
+                    uploadStatus.innerHTML = `<i class="fa-solid fa-spinner fa-spin mb-2 text-xl"></i> Uploading ${percent}%`;
+                }
+            };
+
+            xhr.onload = () => {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    uploadStatus.className = "absolute inset-0 bg-green-500/80 rounded-xl flex items-center justify-center text-sm font-bold opacity-100 pointer-events-auto transition-opacity duration-300 text-white backdrop-blur-sm z-20";
+                    uploadStatus.innerHTML = `✅ Complete!`;
+                    loadDocuments();
+                    
+                    setTimeout(() => {
+                        uploadStatus.style.opacity = '0';
+                        setTimeout(() => uploadStatus.classList.add('pointer-events-none'), 300);
+                    }, 2000);
+                } else {
+                    uploadStatus.className = "absolute inset-0 bg-red-500/80 rounded-xl flex flex-col items-center justify-center text-xs font-semibold opacity-100 pointer-events-auto transition-opacity duration-300 text-white p-2 text-center backdrop-blur-sm z-20";
+                    try {
+                        const err = JSON.parse(xhr.responseText);
+                        uploadStatus.innerHTML = `❌<br>${err.detail || 'Upload failed'}`;
+                    } catch(errBox) {
+                        uploadStatus.innerHTML = `❌<br>Upload failed`;
+                    }
+                    setTimeout(() => { uploadStatus.style.opacity = '0'; setTimeout(() => uploadStatus.classList.add('pointer-events-none'), 300); }, 3000);
+                }
+            };
+            xhr.onerror = () => {
+                uploadStatus.innerHTML = `❌<br>Network Error`;
+                setTimeout(() => { uploadStatus.style.opacity = '0'; setTimeout(() => uploadStatus.classList.add('pointer-events-none'), 300); }, 3000);
+            };
+            xhr.send(formData);
+        });
+
+        // Document List fetching
+        async function loadDocuments() {
+            try {
+                const res = await fetch('/api/documents?_t=' + Date.now());
+                if(!res.ok) return;
+                const data = await res.json();
+                const list = document.getElementById('docList');
+                list.innerHTML = '';
+                
+                if (data.documents.length === 0) {
+                    list.innerHTML = '<li class="text-gray-500 text-xs text-center mt-4">No documents uploaded.</li>';
+                    return;
+                }
+
+                data.documents.forEach(doc => {
+                    const li = document.createElement('li');
+                    li.innerHTML = `
+                        <div class="flex items-center justify-between px-3 py-2 rounded-lg text-gray-400 hover:bg-white/5 hover:text-gray-200 transition-colors group cursor-default">
+                            <div class="flex items-center gap-3 overflow-hidden">
+                                <i class="fa-regular fa-file-lines group-hover:text-gray-300"></i>
+                                <span class="text-sm truncate font-medium max-w-[140px]" title="${doc.filename}">${doc.filename}</span>
+                            </div>
+                            <button class="text-red-400/70 opacity-0 group-hover:opacity-100 hover:text-red-400 hover:scale-110 transition-all p-1" title="Delete Document" onclick="showDeleteModal('${doc.filename}')">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </div>
+                    `;
+                    list.appendChild(li);
+                });
+            } catch(e) { console.error("Failed to load docs", e); }
+        }
+        
+        // --- PDF Source Viewer ---
+        function openPdfViewer(base64Str) {
+            try {
+                const jsonStr = decodeURIComponent(atob(base64Str));
+                const src = JSON.parse(jsonStr);
+                document.getElementById('pdf-viewer-aside').classList.remove('hidden');
+                document.getElementById('pdf-viewer-title').textContent = src.source;
+                document.getElementById('pdf-viewer-page').textContent = "Page " + src.page;
+                
+                const shortTitle = src.source.toUpperCase().replace('.PDF','').replace('.TXT','').replace('.DOCX','');
+                document.getElementById('pdf-viewer-body-title').textContent = shortTitle;
+                document.getElementById('pdf-viewer-body-page').textContent = src.page;
+                
+                const snippetNode = document.getElementById('pdf-viewer-snippet');
+                let snippetText = src.text_snippet;
+                snippetNode.innerHTML = window.marked ? marked.parse(snippetText) : snippetText.replace(/\n/g, '<br>');
+                
+                if (window.MathJax) {
+                    MathJax.typesetClear([snippetNode]);
+                    MathJax.typesetPromise([snippetNode]).catch(err => console.error(err));
+                }
+            } catch(e) {
+                console.error("Failed to parse source payload", e);
+            }
+        }
+        
+        function closePdfViewer() {
+            document.getElementById('pdf-viewer-aside').classList.add('hidden');
+        }
+
+
+        // Modals
+        let documentToDelete = null;
+        function showDeleteModal(filename) {
+            documentToDelete = filename;
+            document.getElementById('modalFilename').textContent = filename;
+            const modal = document.getElementById('deleteModal');
+            const box = document.getElementById('deleteModalBox');
+            modal.classList.remove('pointer-events-none');
+            modal.classList.replace('opacity-0', 'opacity-100');
+            box.classList.replace('scale-95', 'scale-100');
+        }
+
+        function closeDeleteModal() {
+            documentToDelete = null;
+            const modal = document.getElementById('deleteModal');
+            const box = document.getElementById('deleteModalBox');
+            modal.classList.replace('opacity-100', 'opacity-0');
+            box.classList.replace('scale-100', 'scale-95');
+            setTimeout(() => modal.classList.add('pointer-events-none'), 300);
+        }
+
+        async function confirmDelete() {
+            if (!documentToDelete) return;
+            const filename = documentToDelete;
+            closeDeleteModal();
+            try {
+                const res = await fetch(`/api/documents/${encodeURIComponent(filename)}`, { method: 'DELETE' });
+                if(res.ok) loadDocuments();
+                else alert("Failed to delete document.");
+            } catch(e) { console.error(e); }
+        }
+        
+        window.addEventListener('DOMContentLoaded', loadDocuments);
+
+        // --- Chat System Logic ---
+        const chatForm = document.getElementById('chatForm');
+        const queryInput = document.getElementById('queryInput');
+        const chatHistory = document.getElementById('chatHistory');
+        const scroller = document.getElementById('chatHistoryBox');
+
+        let autoScroll = true;
+        scroller.addEventListener('scroll', () => {
+            const isAtBottom = scroller.scrollHeight - scroller.clientHeight <= scroller.scrollTop + 10;
+            autoScroll = isAtBottom;
+        });
+
+        function scrollToBottom() {
+            if (autoScroll) {
+                scroller.scrollTop = scroller.scrollHeight;
+            }
+        }
+
+        chatForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const query = queryInput.value.trim();
+            if (!query) return;
+
+            queryInput.value = '';
+
+            // User message bubble (Tailwind gradient)
+            const userMsgHtml = `
+                <div class="flex justify-end w-full">
+                    <div class="btn-gradient rounded-2xl rounded-tr-sm py-3 px-6 shadow-md max-w-[85%] text-left">
+                        <p class="text-[15px]">${query}</p>
+                    </div>
+                </div>
+            `;
+            chatHistory.insertAdjacentHTML('beforeend', userMsgHtml);
+
+            // Container for AI response
+            const botWrapper = document.createElement('div');
+            botWrapper.className = 'w-full bg-[#282c38]/80 backdrop-blur-md rounded-2xl border border-gray-700/50 shadow-xl overflow-hidden mt-8';
+            
+            const botHeader = `
+                <div class="flex items-center gap-3 px-6 py-4 border-b border-gray-700/50 bg-[#282c38]">
+                    <div class="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center shadow-inner">
+                        <i class="fa-solid fa-robot text-white text-sm"></i>
+                    </div>
+                    <h2 class="font-semibold text-lg tracking-wide text-gray-100">AI Assistant</h2>
+                </div>
+            `;
+            botWrapper.insertAdjacentHTML('beforeend', botHeader);
+
+            const botContentArea = document.createElement('div');
+            botContentArea.className = 'p-6';
+            
+            const botTextNode = document.createElement('div');
+            botTextNode.className = 'text-gray-300 text-[15px] leading-relaxed ai-content space-y-4';
+            botTextNode.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin text-purple-400"></i> Thinking...';
+            botContentArea.appendChild(botTextNode);
+            
+            const botSourcesNode = document.createElement('div');
+            botSourcesNode.className = 'sources-container hidden border-t border-gray-700/30 pt-4 mt-6';
+            botSourcesNode.innerHTML = `
+                <h3 class="text-lg font-semibold text-gray-100 mb-4">Sources</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 sources-grid"></div>
+            `;
+            botContentArea.appendChild(botSourcesNode);
+            botWrapper.appendChild(botContentArea);
+            
+            chatHistory.appendChild(botWrapper);
+
+            // Auto-scroll hack for initial append
+            autoScroll = true;
+            scrollToBottom();
+
+            // SSE Fetch Stream
+            try {
+                const response = await fetch('/api/query', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query: query })
+                });
+
+                if (!response.ok) {
+                    throw new Error("HTTP error " + response.status);
+                }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder("utf-8");
+                let accumulatedText = "";
+                let buffer = "";
+                let lastRenderedText = "";
+                
+                const flushDOM = () => {
+                    if (lastRenderedText === accumulatedText) return;
+                    lastRenderedText = accumulatedText;
+                    
+                    if (accumulatedText.trim().length === 0) {
+                        botTextNode.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin text-purple-400"></i> Thinking...';
+                        return;
+                    }
+                    
+                    // Protect LaTeX blocks from Marked.js mangling underscores
+                    let mathBlocks = [];
+                    const mathRegex = /(\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\]|\\\([\s\S]*?\\\))/g; 
+                    let renderText = accumulatedText.replace(mathRegex, (match) => {
+                        mathBlocks.push(match);
+                        return `@@MATH_BLOCK_${mathBlocks.length - 1}@@`;
+                    });
+                    
+                    let html = window.marked ? marked.parse(renderText) : renderText.replace(/\n/g, '<br>');
+                    
+                    // Restore exact Math blocks
+                    html = html.replace(/@@MATH_BLOCK_(\d+)@@/g, (match, i) => mathBlocks[i]);
+                    
+                    botTextNode.innerHTML = html;
+                    if (window.MathJax) {
+                        MathJax.typesetClear([botTextNode]);
+                        MathJax.typesetPromise([botTextNode]).catch(err => console.error(err));
+                    }
+                    scrollToBottom();
+                };
+                
+                let renderTimer = setInterval(flushDOM, 150);
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop(); // keep remainder
+                    
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const dataStr = line.slice(6).trim();
+                            if (dataStr === '[DONE]') {
+                                clearInterval(renderTimer);
+                                flushDOM(); // Final flush
+                                continue;
+                            }
+                            
+                            try {
+                                const data = JSON.parse(dataStr);
+                                if (data.type === "chunk" || data.type === "content") {
+                                    let chunkText = data.data !== undefined ? data.data : data.content;
+                                    accumulatedText += (chunkText || "");
+                                } 
+                                else if (data.type === "sources") {
+                                    const gridNode = botSourcesNode.querySelector('.sources-grid');
+                                    let pillsHtml = '';
+                                    
+                                    (data.data || data.sources).forEach(src => {
+                                        let linkTitle = `Page ${src.page} (${src.source}) - "${src.text_snippet}"`;
+                                        let safeJson = btoa(encodeURIComponent(JSON.stringify({
+                                            source: src.source,
+                                            page: src.page,
+                                            text_snippet: src.text_snippet
+                                        })));
+                                        
+                                        pillsHtml += `
+                                            <button onclick="openPdfViewer('${safeJson}')" class="source-pill rounded-full py-2 px-4 text-xs text-left text-gray-300 flex items-center gap-2 group w-full truncate" title="${linkTitle.replace(/"/g, '&quot;')}">
+                                                <i class="fa-solid fa-link text-purple-400 opacity-70 group-hover:opacity-100 flex-shrink-0"></i>
+                                                <span class="truncate">${linkTitle}</span>
+                                            </button>
+                                        `;
+                                    });
+                                    
+                                    if ((data.data || data.sources).length > 0) {
+                                        gridNode.innerHTML = pillsHtml;
+                                        botSourcesNode.classList.remove('hidden');
+                                    }
+                                }
+                            } catch (err) { /* split chunks expected sometimes */ }
+                        }
+                    }
+                }
+                clearInterval(renderTimer);
+                flushDOM();
+            } catch (err) {
+                console.error("Stream err", err);
+                botTextNode.innerHTML = "<span class='text-red-400'>Network connection lost.</span>";
+            }
+        });
+    </script>
+</body>
+</html>
