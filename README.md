@@ -56,7 +56,7 @@ rag_system/
 User Query
     │
     ▼
-Query Rewriting (LLM)
+Query Rewriting (LLM)  <-- ACTIVE
     │
     ├──► FAISS Dense Search (OpenRouter Embeddings)
     │
@@ -68,6 +68,7 @@ Query Rewriting (LLM)
          ▼
     Top-K Chunks → LLM (Streaming) → SSE Response to Browser
 ```
+
 
 ---
 
