@@ -1,4 +1,7 @@
+
+=======
 # 🧠 RAG System — Universal Document Q&A
+
 
 A production-ready **Retrieval-Augmented Generation (RAG)** system that lets you upload any document (PDF, TXT, DOCX) and ask questions about it. Powered by a hybrid FAISS + BM25 retrieval engine and streaming LLM responses via [OpenRouter](https://openrouter.ai/).
 
@@ -56,7 +59,7 @@ rag_system/
 User Query
     │
     ▼
-Query Rewriting (LLM)  <-- ACTIVE
+Query Rewriting (LLM)
     │
     ├──► FAISS Dense Search (OpenRouter Embeddings)
     │
@@ -68,7 +71,6 @@ Query Rewriting (LLM)  <-- ACTIVE
          ▼
     Top-K Chunks → LLM (Streaming) → SSE Response to Browser
 ```
-
 
 ---
 
@@ -179,3 +181,4 @@ python-dotenv  — Environment variable loading
 ## 📝 License
 
 MIT License — feel free to use, modify, and distribute.
+
